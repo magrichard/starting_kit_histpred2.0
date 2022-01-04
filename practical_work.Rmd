@@ -1,0 +1,452 @@
+---
+title: "Histology Prediction Challenge 2.0 (expred2.0)"
+subtitle: "Compte-rendu à compléter"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+``` 
+
+This document is a guide to help you solving the *data challenge* `histpred2.0` available here : 
+
+https://competitions.codalab.org/competitions/25357?secret_key=3a54cc71-6bbf-4e30-bf98-e9ec502853bf
+
+The challenge provides the data.frame d of tumoral tissues described by genes expression values, histological and clinical attributes. Some histological status are missing. The **goal** of the challenge is to use statistical models (e.g. logistic regression) to predict missing histological status using provided gene expression values and clinical attributes.
+
+
+Each patient has lung cancer, that can be classified into 2 histology classe (associated with different prognosis) : 
+
+- AD: lung adenocarcinoma
+- SC: lung squammous cell carcinoma
+
+
+Our **aim** is :
+
+1. to explain the histology in the `data_train` dataset using gene expression data;
+2. to predict the histologt the `data_test` dataset using gene expression data.
+
+
+The provided data are data frames named data_train and data_test.
+
+- the train data set is composed of 546 observations and 1003 variables (3 clinical variables and 1000 gene expressions)
+
+- the test data set is composed of 100 observations and 1003 variables (3 clinical variables and 1000 gene expressions).
+
+
+# Descriptive statistics
+
+**Dataset `data_train`**
+
+```{r loading_data, echo=TRUE, results="verbatim"}
+data_train = readRDS(file = "data_train.rds")
+data_test = readRDS(file = "data_test.rds")
+dim(data_train)
+dim(data_test)
+head(data_train[,1:6])
+table(data_train$sex)
+table(data_train$histology)
+
+```
+
+**Histology according to age and sex in `data_train`**
+
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+h = as.factor(data_train$histology)
+plot(data_train$age, jitter((as.numeric(h) -1), factor=.1), main="Histology~age", xlab="Age", ylab="Histology", ylim=c(-.1,1.1))
+plot(data_train$sex, h, main="Histology~sex", xlab="Age", ylab="Histology", ylim=c(-.1,1.1))
+
+```
+
+
+**Gene expression distribution in `data_train`**
+
+```{r distr_data_rain, echo=TRUE, results="verbatim"}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(density(as.matrix(data_train[,4:1003]))   , main="Transcriptome (log2(counts+1))")
+plot(density(as.matrix(2^(data_train[,4:1003])))   , main="Transcriptome (counts)")
+```
+
+
+# Introduction to logistic regression
+
+On considère dans cette section une relation entre une variable binaire $Y$  et une variables explicatives $X$ quantitatives et on cherche à modéliser :
+
+$$Y \sim X$$
+
+
+$$\mathbb{E}(Y|X) = \mathbb{P}(Y=1|X=x) = \pi (x)$$
+
+
+## Case 1: Explain Y with a linear regression
+
+
+Let's consider the following model $\pi(x) = \beta_0 + \beta_1 x$ :
+
+$$\mathbb{P}(Y=1|x)=\pi (x) = \beta_0 + \beta_1 x$$
+
+Problem: $\pi(x)$ takes values oustide $[0,1]$ interval. 
+
+## Case 2: Explain Y with a logistic regression
+
+We introduce the *logit* function
+
+
+\begin{eqnarray}
+\text{logit: } ]0,1[ &\rightarrow& \mathbb{R}                  &\qquad& \lim_{x\to0} logit(x) &=& -\infty  \hspace{12cm}\\
+                   x &\rightarrow& logit(x)=log(\frac{x}{1-x}) &\qquad& \lim_{x\to1} logit(x) &=& +\infty  \hspace{12cm}\\
+\end{eqnarray}
+
+
+
+
+
+\begin{eqnarray}
+\hspace{12cm} \text{logit$^{-1}$: } \mathbb{R} &\rightarrow& ]0,1[                            &\qquad& \lim_{x\to-\infty} logit^{-1}(x) &=& 0\\
+\hspace{12cm}                                x &\rightarrow& logit^{-1}(x)=\frac{1}{1+e^{-x}} &\qquad& \lim_{x\to+\infty} logit^{-1}(x) &=& 1\\
+\end{eqnarray}
+
+We consider the logistic model in which $\pi(x) = logit^{-1}(\beta_0 + \beta_1 x)$ :
+
+$$\mathbb{P}(Y=1|x) = \pi(x) = logit^{-1}(\beta_0 + \beta_1 x)$$ 
+
+
+## Vizualisation
+
+
+
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+
+Y_var = as.numeric(h) -1
+X_var = data_train$PRDM16
+
+### CASE 1
+plot(X_var, jitter(Y_var, factor=.1), main="Linear model", xlab="X_var", ylab="Histology")
+m_linreg = lm(Y_var~X_var) # lm for linear regression in R
+abline(m_linreg, col=2, lwd=2)
+arrows(X_var, Y_var, X_var, Y_var-m_linreg$residuals, col=adjustcolor(4, alpha.f=0.2), length=0.1, lwd=2)
+legend("bottomright",c("regression line", "residuals"), col=c(2,4), lty=1, cex=0.6)
+
+### CASE 2
+plot(X_var, jitter(Y_var, factor=.1), main="Logistic model", xlab="X_var", ylab="Histology")
+m_logreg = glm(Y_var~X_var, family = binomial(logit)) # glm for generalized linear model + logit function -> logistic regression in R
+m_logreg$coefficients
+logitinv = function(x) 1/(1 + exp(-x))
+x = seq(min(X_var), max(X_var), length.out=30)
+lines(x, logitinv(m_logreg$coefficients[[1]] + m_logreg$coefficients[[2]]*x), col=2, lwd=2)
+py1x = function(t,m) {
+  x = m$coefficients[[1]] + m$coefficients[[2]]*t #x définit par le fit du modèle en fonction de t la valeur du Bwt
+  1/(1 + exp(-x)) #logit de x
+}
+arrows(X_var, Y_var, X_var, py1x(X_var,m_logreg), col=adjustcolor(4, alpha.f=0.2), length=0.05, lwd=3)
+legend("bottomright", c(expression(paste("P(Y=1|x)=", pi, "(x)=", logit^-1, "(", beta , "x)")), expression("1 - P(Y=y_i|X=x_i)")), col=c(2,4), lty=1, cex=0.6)
+```
+
+
+# Define your model
+
+## Univariate approach: Shurely Independant Screening
+
+The method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] can be applied to *transcriptome* data to: 
+
+i) perform multiple univariate logistic regression following the model $histo \sim gene$  ; 
+ii) select the genes corresponding to the best model (according to associated p-value or deviance) ($gene_1, gene_2, gene_3 ...$) ; 
+iii) define a multivariate model $histo \sim gene_1 + gene_2 + gene_3 + ...$
+
+
+1. Correct the following code
+
+```{r screening, echo=TRUE, results="verbatim"}
+data_train$histology = as.factor(data_train$histology)
+data_test$histology  = as.factor(data_test$histology)
+    
+siscreening = function(data_train) {
+  gs = colnames(data_train)[4:1003]
+  pval = c()
+  beta = c()
+  dev = c()
+  for (g in gs) {
+    formula = as.formula(paste0("histology~",1)) # /!\ to be edited
+    m = glm(formula, data_train, family =binomial(link = 'logit'))    
+    pval = c(pval, 1) # /!\ to be edited
+    beta = c(beta, m$coefficients[[1]]) # /!\ to be edited
+    dev = c(dev, summary(m)$deviance)
+  }
+  names(pval)  = gs
+  names(beta)         = gs  
+  names(dev)           = gs  
+  return(data.frame(pval=pval, beta=beta, dev=dev))
+}
+
+sis_res = siscreening(data_train)  
+head(sis_res)
+row
+```
+
+2. Plot the **volcano plot** corresponding to the screening: on the abscissa we plot the beta of each independent model and on the ordinate the corresponding $-log10 (pval)$. Think about the titles. Comment. 
+
+
+3. Draw on the abscissa the $Deviance$ of each independent model and on the ordinate the corresponding $-log10 (pval)$. Think about the titles. Comment. 
+
+
+
+4. Comment the following codes and graphs : 
+
+```{r sis_1, echo=TRUE, results="verbatim"}
+layout(matrix(1:2, 1), respect=TRUE)
+
+#PLOT 1
+
+X_var =  data_train[,"TINCR"]
+Y_var = as.numeric(data_train[,"histology"]) -1
+
+m =  glm(Y_var ~ X_var, data_train, family =binomial(link = 'logit')) 
+
+plot(X_var, Y_var, main=paste0("histology ~ TINCR dev : ", signif(summary(m)$deviance, 3)), ylab = "HISTO")
+x = seq(min(X_var), max(X_var), length.out=30)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+
+#PLOT 2
+
+X_var =  data_train[,"PTHLH"]
+Y_var = as.numeric(data_train[,"histology"]) -1
+m =  glm(Y_var ~ X_var, data_train, family =binomial(link = 'logit'))  
+
+plot(X_var, Y_var, main=paste0("histology ~ PTHLH dev : ", signif(summary(m)$deviance, 3)), ylab = "HISTO")
+x = seq(min(X_var), max(X_var), length.out=30)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+
+```
+
+
+5. Construct a multivariate model with the best gene candidates obtained with the SIS approach. What is the deviance of this model ? 
+
+6. Use the `pairs` function and plot the correlations of the 8 best genes obtained with the SIS method. Comment 
+
+```{r pairs8_sis, fig.height=9, echo=TRUE, results="verbatim"}
+sis_genes = rownames(sis_res)[order(sis_res$pva)]
+pairs(data_train[,sis_genes[1:8]], main="pair_plot")
+```
+
+7. Analyze the following function. What is she doing ? What values can the `i` argument take? 
+
+```{r model_sis_i, echo=TRUE, results="verbatim", echo=TRUE, results="verbatim"}
+model_sis_i = function(data_train, i, screening_func=siscreening) { 
+  print(paste0("model SIS ", i))
+  # independant screening on train
+  sis_res = screening_func(data_train)
+  sis_genes = rownames(sis_res)[order(sis_res$pval)]
+  # build model
+  formula = as.formula(paste0(c("histology ~ 1",sis_genes[0:i]),collapse="+"))
+  m = glm(formula, data_train, family =binomial(link = 'logit'))  
+  return(m)
+}
+```
+
+8. Build the models `sis_0`,` sis_1`, `sis_2`, ...,` sis_50` in turn. Observe the evolution of the $Deviance$ in these models. Comment.
+
+```{r sis_n, echo=TRUE, results="hide"}
+dev_sis = c()
+for (i in 0:50) {
+ # m = ... 
+ # dev_sis = c(dev_sis, summary(m)$deviance)
+}
+# plot(0:50, dev_sis)
+```
+
+
+
+
+
+## Method *stepwise* 
+
+We have just seen that not all genes provide the same amount of "new" information. We will take advantage of the * step forward * variable selection method to select genes that provide "new" information. Indeed, we are going to start from the null model and add one by one the genes, among the 50 best genes obtained thanks to the SIS method, which considerably increase the quality of the model. 
+
+
+1. Analyze the following code. What does the `step` function do? What does the returned variable `step_genes` contain? 
+
+```{r step_model, echo=TRUE, results="hide"}
+stepforward = function(data_train, sis_genes, trace, nb_sis_genes=50) {
+  m_lo = glm(histology ~ 1, 
+             data=data_train[,c("histology", sis_genes[1:nb_sis_genes])],
+              family =binomial(link = 'logit'))
+  m_up = glm(histology ~ ., 
+             data=data_train[,c("histology", sis_genes[1:nb_sis_genes])],
+              family =binomial(link = 'logit'))
+  m_fwd = step(m_lo, method="forward", scope=list(upper=m_up,lower=m_lo), trace=trace)  
+  # print(m_fwd$call)
+  step_genes = names(m_fwd$coefficients)[-1]
+}
+
+step_genes = stepforward(data_train, sis_genes, trace=1)
+step_genes
+```
+
+2. Use the `pairs` function to plot the correlations of the best 8 obtained with the` step` method. 
+
+```{r pairs8_step, fig.height=9}
+pairs(data_train[,step_genes[1:8]], main="pair_plot")
+```
+
+3. Display on the volcano plot of the independent screening the genes selected by `stepforward`. Comment. 
+
+```{r volcano2, echo=TRUE, results="verbatim"}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(sis_res$beta, -log10(sis_res$pval))
+idx = step_genes
+text(sis_res[idx,]$beta, -log10(sis_res[idx,]$pval), idx, col=2)
+```
+
+
+4. Analyze the following function. What is she doing ? What values can the `i` argument take? 
+
+```{r model_stp_i, echo=TRUE, results="verbatim"}
+model_stp_i = function(data_train, i, step_func=stepforward) { 
+  print(paste0("model step ", i))
+  # independant screening on train
+  sis_res = msiscreening(data_train)
+  sis_genes = rownames(sis_res)[order(sis_res$pval)]
+  # step
+  step_genes = step_func(data_train, sis_genes, trace=0)
+  # build model
+  formula = as.formula(paste0(c("histology~1",step_genes[0:i]),collapse="+"))
+  m = glm(formula, data_train, family =binomial(link = 'logit'))  
+  return(m)
+}
+```
+
+5. Build the models `stp_0`,` stp_1`, `stp_2`, ...,` stp_20` in turn. Observe the evolution of the $Deviance$ in these models. Compare with the evolution of $Deviance$ obtained with the models `sis_0`,` sis_1`, `sis_2`, ...,` sis_50`. Comment. 
+
+```{r , echo=TRUE, results="verbatim"}
+dev_step <- c()
+for(i in 0:20){
+  # m = ...
+  # dev_step = c(dev_step, summary(m)$deviance)
+}
+
+# plot(0:50, dev_sis, ylim=c(0,1))
+# points(0:20, dev_step, col=2)
+```
+
+
+# Predict the histology on the test set
+
+1. Use the function predict to make a prediction of histology values on the `test dataset` using your favorite model.
+
+```{r step_n, echo=TRUE, results="verbatim"}
+formula = as.formula(paste0("histology~", "1")) # your favorite model
+print(formula)
+m = glm(formula, data_train, family =binomial(link = 'logit'))
+pred = predict.glm(m, data_test, type="response")
+
+threshold = 0.5 # you can change the threshold
+
+data_pred = ifelse(pred < threshold, "AD", "SC")
+data_pred
+```
+
+2. Edit the `submission_script.R` script to update it with your favorite model. Generate a program or result .zip file and submit it to the codalab platform to get your error score
+
+3. Try to improve your score
+
+# To go further
+
+## Cross validation
+
+You con control overfitting by using a cross-validation approach on the dataset `data train`
+
+Divide the dataset in 5 *folds* (`flds`) use these fold to create 5 *train/test*  (`runs`) dataset. By comparing the errors obtained for the `train` datasets and for the` test` datasets, you can estimate the overfitting. 
+
+
+
+```{r cross_val, echo=TRUE}
+#  1. folds
+flds = list()
+set.seed(1)
+idx_samples = sample(rownames(data_train))
+flds[[1]] = idx_samples[001:080]
+flds[[2]] = idx_samples[081:160]
+flds[[3]] = idx_samples[161:240]
+flds[[4]] = idx_samples[241:320]
+flds[[5]] = idx_samples[321:400]
+
+# 2. runs
+runs = list()
+runs[[1]] = list(train=data_train[setdiff(idx_samples, flds[[1]]),], test=data_train[flds[[1]],])
+runs[[2]] = list(train=data_train[setdiff(idx_samples, flds[[2]]),], test=data_train[flds[[2]],])
+runs[[3]] = list(train=data_train[setdiff(idx_samples, flds[[3]]),], test=data_train[flds[[3]],])
+runs[[4]] = list(train=data_train[setdiff(idx_samples, flds[[4]]),], test=data_train[flds[[4]],])
+runs[[5]] = list(train=data_train[setdiff(idx_samples, flds[[5]]),], test=data_train[flds[[5]],])
+
+# 3. eval
+IAC = function(data_truth, data_pred) {
+    # Incorrect Answers Counts
+    return( length(data_truth) - sum(data_truth == data_pred) )
+}
+
+formula = as.formula(paste0("histology~", "1")) # your favorite model
+print(formula)
+threshold = 0.5 # you can change the threshold
+
+
+train_err=c()
+test_err=c()
+for (i in 1:5) {
+  train = runs[[i]]$train
+  test = runs[[i]]$test
+ m = glm(formula, train, family =binomial(link = 'logit'))
+  pred =  predict.glm(m, train, type="response")
+  train_pred = ifelse(pred < threshold, "AD", "SC")
+  train_truth = train$histology
+  train_err[i] = IAC(train_truth, train_pred)/length(train_truth)  
+  pred =  predict.glm(m, test, type="response")
+  test_pred = ifelse(pred < threshold, "AD", "SC")
+  test_truth = test$histology
+  test_err[i] = IAC(test_truth, test_pred)/length(test_truth)  
+} 
+
+stats = data.frame(set=rep(c("train", "trest"), each=5), IAC=c(train_err, test_err)) 
+
+# 4. error
+bp = boxplot(IAC~set, stats, las=2, border="grey")  
+points(apply(bp$stats, 2, mean), col=c(2,4))
+legend("topright", c("mean on trains", "mean on tests"), pch=1, col=c(2,4))
+```
+
+
+** CAUTION **, make sure that each model training is done on a dataset independent of the test set, in order to avoid ** information leakage **. Here we made sure to calculate the `sis_genes` and` step_genes` variables on the training datasets independent of the test datasets.
+
+The cross-validation is a tool here allowing to fix the * hyper-parameters * of our models (here, the number of explanatory variables of the models `model_sis_i` and` model_stp_i`. In the same way we could optimize the number of candidate genes obtained by the "SIS" method and which is injected into the "step" method (here 50). 
+
+
+## Neural network
+
+Try to use the function `nnet::nnet` to perform feature selection and to define your model.
+
+
+## Random Forest
+
+Try to use the function `randomForest::randomForest` to perform feature selection and to define your model.
+
+
+
+## Support Vector Machine
+
+Try to use the function `e1071::svm` to perform feature selection and to define your model.
+
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
+
+
