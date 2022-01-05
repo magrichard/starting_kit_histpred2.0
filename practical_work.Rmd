@@ -1,7 +1,7 @@
 ---
 title: "Histology Prediction Challenge 2.0 (expred2.0)"
-subtitle: "Compte-rendu à compléter"
-author: "Florent Chuffart"
+subtitle: "Report to complete"
+author: "Florent Chuffart & Magali Richard"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_document:
