@@ -22,16 +22,16 @@ https://competitions.codalab.org/competitions/25357?secret_key=3a54cc71-6bbf-4e3
 The challenge provides the data.frame d of tumoral tissues described by genes expression values, histological and clinical attributes. Some histological status are missing. The **goal** of the challenge is to use statistical models (e.g. logistic regression) to predict missing histological status using provided gene expression values and clinical attributes.
 
 
-Each patient has lung cancer, that can be classified into 2 histology classe (associated with different prognosis) : 
+Each patient has lung cancer, that can be classified into 2 histology classes (associated with different prognosis) : 
 
 - AD: lung adenocarcinoma
-- SC: lung squammous cell carcinoma
+- SC: lung squamous cell carcinoma
 
 
 Our **aim** is :
 
 1. to explain the histology in the `data_train` dataset using gene expression data;
-2. to predict the histologt the `data_test` dataset using gene expression data.
+2. to predict the histology the `data_test` dataset using gene expression data.
 
 
 The provided data are data frames named data_train and data_test.
@@ -62,7 +62,7 @@ table(data_train$histology)
 layout(matrix(1:2, 1), respect=TRUE)
 h = as.factor(data_train$histology)
 plot(data_train$age, jitter((as.numeric(h) -1), factor=.1), main="Histology~age", xlab="Age", ylab="Histology", ylim=c(-.1,1.1))
-plot(data_train$sex, h, main="Histology~sex", xlab="Age", ylab="Histology", ylim=c(-.1,1.1))
+plot(data_train$sex, h, main="Histology~sex", xlab="Sex", ylab="Histology", ylim=c(0,1))
 
 ```
 
@@ -72,7 +72,7 @@ plot(data_train$sex, h, main="Histology~sex", xlab="Age", ylab="Histology", ylim
 ```{r distr_data_rain, echo=TRUE, results="verbatim"}
 layout(matrix(1:2, 1), respect=TRUE)
 plot(density(as.matrix(data_train[,4:1003]))   , main="Transcriptome (log2(counts+1))")
-plot(density(as.matrix(2^(data_train[,4:1003])))   , main="Transcriptome (counts)")
+plot(density(as.matrix(2^(data_train[,4:1003])-1))   , main="Transcriptome (counts)")
 ```
 
 
@@ -91,7 +91,7 @@ A linear regression will consider the following model $\pi(x) = \beta_0 + \beta_
 
 $$\mathbb{P}(Y=1|x)=\pi (x) = \beta_0 + \beta_1 x$$
 
-Problem of linear regression: the fit is not good (the error is big) and $\pi(x)$ takes values oustide $[0,1]$ interval. 
+Problem of linear regression: the fit is not good (the error is big) and $\pi(x)$ takes values outside the $$[\mid0,1\mid]$$ range. 
 
 
 The logistic regression relies on the use of the *logit* function as link function:
@@ -103,11 +103,8 @@ The logistic regression relies on the use of the *logit* function as link functi
 \end{eqnarray}
 
 
-
-
-
 \begin{eqnarray}
-\hspace{12cm} \text{logit$^{-1}$: } \mathbb{R} &\rightarrow& ]0,1[                            &\qquad& \lim_{x\to-\infty} logit^{-1}(x) &=& 0\\
+\text{logit$^{-1}$: } \mathbb{R} &\rightarrow& ]0,1[                            &\qquad& \lim_{x\to-\infty} logit^{-1}(x) &=& 0\\
 \hspace{12cm}                                x &\rightarrow& logit^{-1}(x)=\frac{1}{1+e^{-x}} &\qquad& \lim_{x\to+\infty} logit^{-1}(x) &=& 1\\
 \end{eqnarray}
 
@@ -184,7 +181,6 @@ siscreening = function(data_train) {
 
 sis_res = siscreening(data_train)  
 head(sis_res)
-row
 ```
 
 2. Plot the **volcano plot** corresponding to the screening: on the abscissa we plot the beta of each independent model and on the ordinate the corresponding $-log10 (pval)$. Think about the titles. Comment. 
@@ -206,7 +202,7 @@ Y_var = as.numeric(data_train[,"histology"]) -1
 
 m =  glm(Y_var ~ X_var, data_train, family =binomial(link = 'logit')) 
 
-plot(X_var, Y_var, main=paste0("histology ~ TINCR dev : ", signif(summary(m)$deviance, 3)), ylab = "HISTO")
+plot(X_var, Y_var, main=paste0("histology ~ TINCR, dev : ", signif(summary(m)$deviance, 3)), ylab = "HISTO")
 x = seq(min(X_var), max(X_var), length.out=30)
 lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
 
@@ -216,7 +212,7 @@ X_var =  data_train[,"PTHLH"]
 Y_var = as.numeric(data_train[,"histology"]) -1
 m =  glm(Y_var ~ X_var, data_train, family =binomial(link = 'logit'))  
 
-plot(X_var, Y_var, main=paste0("histology ~ PTHLH dev : ", signif(summary(m)$deviance, 3)), ylab = "HISTO")
+plot(X_var, Y_var, main=paste0("histology ~ PTHLH, dev : ", signif(summary(m)$deviance, 3)), ylab = "HISTO")
 x = seq(min(X_var), max(X_var), length.out=30)
 lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
 
@@ -228,11 +224,11 @@ lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
 6. Use the `pairs` function and plot the correlations of the 8 best genes obtained with the SIS method. Comment 
 
 ```{r pairs8_sis, fig.height=9, echo=TRUE, results="verbatim"}
-sis_genes = rownames(sis_res)[order(sis_res$pva)]
+sis_genes = rownames(sis_res)[order(sis_res$pval)]
 pairs(data_train[,sis_genes[1:8]], main="pair_plot")
 ```
 
-7. Analyze the following function. What is she doing ? What values can the `i` argument take? 
+7. Analyze the following function. What is it doing ? What values can the `i` argument take? 
 
 ```{r model_sis_i, echo=TRUE, results="verbatim", echo=TRUE, results="verbatim"}
 model_sis_i = function(data_train, i, screening_func=siscreening) { 
@@ -280,6 +276,7 @@ stepforward = function(data_train, sis_genes, trace, nb_sis_genes=50) {
   m_fwd = step(m_lo, method="forward", scope=list(upper=m_up,lower=m_lo), trace=trace)  
   # print(m_fwd$call)
   step_genes = names(m_fwd$coefficients)[-1]
+  return(step_genes)
 }
 
 step_genes = stepforward(data_train, sis_genes, trace=1)
@@ -301,13 +298,13 @@ text(sis_res[idx,]$beta, -log10(sis_res[idx,]$pval), idx, col=2)
 ```
 
 
-4. Analyze the following function. What is she doing ? What values can the `i` argument take? 
+4. Analyze the following function. What is it doing ? What values can the `i` argument take? 
 
 ```{r model_stp_i, echo=TRUE, results="verbatim"}
 model_stp_i = function(data_train, i, step_func=stepforward) { 
   print(paste0("model step ", i))
   # independant screening on train
-  sis_res = msiscreening(data_train)
+  sis_res = siscreening(data_train)
   sis_genes = rownames(sis_res)[order(sis_res$pval)]
   # step
   step_genes = step_func(data_train, sis_genes, trace=0)
@@ -338,7 +335,7 @@ for(i in 0:20){
 
 You can control overfitting by using a cross-validation approach on the dataset `data train`
 
-Divide the dataset in 5 *folds* (`flds`) use these fold to create 5 *train/test*  (`runs`) dataset. By comparing the errors obtained for the `train` datasets and for the` test` datasets, you can estimate the overfitting. 
+Divide the dataset 5 *folds* (`flds`), use these folds to create 5 *train/test*  (`runs`) datasets. By comparing the errors obtained for the `train` datasets and for the` test` datasets, you can estimate the overfitting. 
 
 
 
@@ -377,7 +374,7 @@ test_err=c()
 for (i in 1:5) {
   train = runs[[i]]$train
   test = runs[[i]]$test
- m = glm(formula, train, family =binomial(link = 'logit'))
+  m = glm(formula, train, family =binomial(link = 'logit'))
   pred =  predict.glm(m, train, type="response")
   train_pred = ifelse(pred < threshold, "AD", "SC")
   train_truth = train$histology
@@ -397,9 +394,9 @@ legend("topright", c("mean on trains", "mean on tests"), pch=1, col=c(2,4))
 ```
 
 
-** CAUTION **, make sure that each model training is done on a dataset independent of the test set, in order to avoid ** information leakage **. Here we made sure to calculate the `sis_genes` and` step_genes` variables on the training datasets independent of the test datasets.
+**CAUTION, make sure that each model training is done on a dataset independent of the test set, in order to avoid information leakage **. Here we made sure to calculate the `sis_genes` and` step_genes` variables on the training datasets independent of the test datasets.
 
-The cross-validation is a tool here allowing to fix the * hyper-parameters * of our models (here, the number of explanatory variables of the models `model_sis_i` and` model_stp_i`. In the same way we could optimize the number of candidate genes obtained by the "SIS" method and which is injected into the "step" method (here 50). 
+The cross-validation is a tool allowing to fix the * hyper-parameters * of our models (here, the number of explanatory variables of the models `model_sis_i` and` model_stp_i`. In the same way we could optimize the number of candidate genes obtained by the "SIS" method which are injected into the "step" method (here 50). 
 
 ### Penalized regression
 
@@ -413,12 +410,9 @@ Try to use the function `FactoMineR::PCA` to perform feature selection and to de
 
 Try to use the function `nnet::nnet` to perform feature selection and to define your model.
 
-
 ### Random Forest
 
 Try to use the function `randomForest::randomForest` to perform feature selection and to define your model.
-
-
 
 ### Support Vector Machine
 
@@ -440,7 +434,7 @@ data_pred = ifelse(pred < threshold, "AD", "SC")
 data_pred
 ```
 
-2. Edit the `submission_script.R` script to update it with your favorite model. Generate a program or result .zip file and submit it to the codalab platform to get your error score
+2. Edit the `submission_script.R` script to update it with your favorite model. Generate a program or result zip file and submit it to the codalab platform to get your error score.
 
 3. Try to improve your score
 
