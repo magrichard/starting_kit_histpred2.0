@@ -76,28 +76,25 @@ plot(density(as.matrix(2^(data_train[,4:1003])))   , main="Transcriptome (counts
 ```
 
 
-# Introduction to logistic regression
+# Define your model using the training set
 
-On considère dans cette section une relation entre une variable binaire $Y$  et une variables explicatives $X$ quantitatives et on cherche à modéliser :
+## A classical approach to model Y: the logistic regression
+
+In this section, we consider a relation between a binary variable $Y$ and a quantitative explanatory variable $X$. We try to model: 
 
 $$Y \sim X$$
 
 
 $$\mathbb{E}(Y|X) = \mathbb{P}(Y=1|X=x) = \pi (x)$$
 
-
-## Case 1: Explain Y with a linear regression
-
-
-Let's consider the following model $\pi(x) = \beta_0 + \beta_1 x$ :
+A linear regression will consider the following model $\pi(x) = \beta_0 + \beta_1 x$ :
 
 $$\mathbb{P}(Y=1|x)=\pi (x) = \beta_0 + \beta_1 x$$
 
-Problem: $\pi(x)$ takes values oustide $[0,1]$ interval. 
+Problem of linear regression: the fit is not good (the error is big) and $\pi(x)$ takes values oustide $[0,1]$ interval. 
 
-## Case 2: Explain Y with a logistic regression
 
-We introduce the *logit* function
+The logistic regression relies on the use of the *logit* function as link function:
 
 
 \begin{eqnarray}
@@ -119,7 +116,6 @@ We consider the logistic model in which $\pi(x) = logit^{-1}(\beta_0 + \beta_1 x
 $$\mathbb{P}(Y=1|x) = \pi(x) = logit^{-1}(\beta_0 + \beta_1 x)$$ 
 
 
-## Vizualisation
 
 
 
@@ -152,9 +148,8 @@ legend("bottomright", c(expression(paste("P(Y=1|x)=", pi, "(x)=", logit^-1, "(",
 ```
 
 
-# Define your model
 
-## Univariate approach: Shurely Independant Screening
+## The univariate approach: Shurely Independant Screening
 
 The method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] can be applied to *transcriptome* data to: 
 
@@ -267,14 +262,14 @@ for (i in 0:50) {
 
 
 
-## Method *stepwise* 
+## How to build multivariate models : the method *stepwise* 
 
 We have just seen that not all genes provide the same amount of "new" information. We will take advantage of the * step forward * variable selection method to select genes that provide "new" information. Indeed, we are going to start from the null model and add one by one the genes, among the 50 best genes obtained thanks to the SIS method, which considerably increase the quality of the model. 
 
 
 1. Analyze the following code. What does the `step` function do? What does the returned variable `step_genes` contain? 
 
-```{r step_model, echo=TRUE, results="hide"}
+```{r step_model, echo=TRUE, results="hide", warning = FALSE}
 stepforward = function(data_train, sis_genes, trace, nb_sis_genes=50) {
   m_lo = glm(histology ~ 1, 
              data=data_train[,c("histology", sis_genes[1:nb_sis_genes])],
@@ -288,7 +283,6 @@ stepforward = function(data_train, sis_genes, trace, nb_sis_genes=50) {
 }
 
 step_genes = stepforward(data_train, sis_genes, trace=1)
-step_genes
 ```
 
 2. Use the `pairs` function to plot the correlations of the best 8 obtained with the` step` method. 
@@ -337,32 +331,12 @@ for(i in 0:20){
 # points(0:20, dev_step, col=2)
 ```
 
+## How to improve feature selection for multivariate models?
 
-# Predict the histology on the test set
 
-1. Use the function predict to make a prediction of histology values on the `test dataset` using your favorite model.
+### Cross validation
 
-```{r step_n, echo=TRUE, results="verbatim"}
-formula = as.formula(paste0("histology~", "1")) # your favorite model
-print(formula)
-m = glm(formula, data_train, family =binomial(link = 'logit'))
-pred = predict.glm(m, data_test, type="response")
-
-threshold = 0.5 # you can change the threshold
-
-data_pred = ifelse(pred < threshold, "AD", "SC")
-data_pred
-```
-
-2. Edit the `submission_script.R` script to update it with your favorite model. Generate a program or result .zip file and submit it to the codalab platform to get your error score
-
-3. Try to improve your score
-
-# To go further
-
-## Cross validation
-
-You con control overfitting by using a cross-validation approach on the dataset `data train`
+You can control overfitting by using a cross-validation approach on the dataset `data train`
 
 Divide the dataset in 5 *folds* (`flds`) use these fold to create 5 *train/test*  (`runs`) dataset. By comparing the errors obtained for the `train` datasets and for the` test` datasets, you can estimate the overfitting. 
 
@@ -427,22 +401,50 @@ legend("topright", c("mean on trains", "mean on tests"), pch=1, col=c(2,4))
 
 The cross-validation is a tool here allowing to fix the * hyper-parameters * of our models (here, the number of explanatory variables of the models `model_sis_i` and` model_stp_i`. In the same way we could optimize the number of candidate genes obtained by the "SIS" method and which is injected into the "step" method (here 50). 
 
+### Penalized regression
 
-## Neural network
+Try to use the function `caret::glmnet` to try lasso and ridge penalization.
+
+### Feature selection by PCA
+
+Try to use the function `FactoMineR::PCA` to perform feature selection and to define your model.
+
+### Neural network
 
 Try to use the function `nnet::nnet` to perform feature selection and to define your model.
 
 
-## Random Forest
+### Random Forest
 
 Try to use the function `randomForest::randomForest` to perform feature selection and to define your model.
 
 
 
-## Support Vector Machine
+### Support Vector Machine
 
 Try to use the function `e1071::svm` to perform feature selection and to define your model.
 
+# Use your model to predict the histology on the test set
+
+1. Use the function predict to make a prediction of histology values on the `test dataset` using your favorite model.
+
+```{r step_n, echo=TRUE, results="verbatim"}
+formula = as.formula(paste0("histology~", "1")) # your favorite model
+print(formula)
+m = glm(formula, data_train, family =binomial(link = 'logit'))
+pred = predict.glm(m, data_test, type="response")
+
+threshold = 0.5 # you can change the threshold
+
+data_pred = ifelse(pred < threshold, "AD", "SC")
+data_pred
+```
+
+2. Edit the `submission_script.R` script to update it with your favorite model. Generate a program or result .zip file and submit it to the codalab platform to get your error score
+
+3. Try to improve your score
+
+# R Session Information
 
 ```{r, results="verbatim"}
 sessionInfo()
