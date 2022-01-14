@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_selection import chi2
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, log_loss
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
@@ -66,3 +65,18 @@ Xvarstrain=Xtrain[:,feats]
 logregmodel=LogisticRegression(solver='liblinear', random_state=0)
 logregmodel.fit(Xvarstrain, Ytrain)
 confusion_matrix(Ytrain, logregmodel.predict(Xvarstrain))
+
+## Other classifiers
+# Random Forest
+from sklearn.ensemble import RandomForestRegressor
+rfmodel = RandomForestRegressor(n_estimators = 1000, random_state = 0)
+rfmodel.fit(Xtrain, Ytrain)
+
+# SVM
+from sklearn import svm
+svmmodel = svm.SVC(kernel='linear')
+svmmodel.fit(Xtrain, Ytrain)
+
+## Cross validation
+from sklearn.model_selection import train_test_split
+train_features, test_features, train_labels, test_labels = train_test_split(Xtrain, Ytrain, test_size = 0.25, random_state = 0)
