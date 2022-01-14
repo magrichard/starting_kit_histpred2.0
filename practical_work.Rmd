@@ -69,7 +69,7 @@ plot(data_train$sex, h, main="Histology~sex", xlab="Sex", ylab="Histology", ylim
 
 **Gene expression distribution in `data_train`**
 
-```{r distr_data_rain, echo=TRUE, results="verbatim"}
+```{r distr_data_train, echo=TRUE, results="verbatim"}
 layout(matrix(1:2, 1), respect=TRUE)
 plot(density(as.matrix(data_train[,4:1003]))   , main="Transcriptome (log2(counts+1))")
 plot(density(as.matrix(2^(data_train[,4:1003])-1))   , main="Transcriptome (counts)")
