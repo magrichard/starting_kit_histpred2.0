@@ -51,8 +51,18 @@ def siscreening(train_df):
     return({"pval":pval,"beta":beta,"dev":dev})
 siscreening(train_df)
 
+## Retrieve top n genes from the SIS approach
+feats_n=np.argsort(siscreening(train_df)['pval'])[0:n].tolist()
+
 ## Scale the data
 scaler = StandardScaler()
 scaler.fit(Xtrain)
 Xtrain = scaler.transform(Xtrain)
 Xtest = scaler.transform(Xtest)
+
+## Try multivariate logistic regression
+feats=[0,1,2] # EDIT
+Xvarstrain=Xtrain[:,feats]
+logregmodel=LogisticRegression(solver='liblinear', random_state=0)
+logregmodel.fit(Xvarstrain, Ytrain)
+confusion_matrix(Ytrain, logregmodel.predict(Xvarstrain))
